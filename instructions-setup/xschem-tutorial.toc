@@ -1,0 +1,47 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {section}{\numberline {2}Prerequisites and Setup}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Software}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Environment Check}{3}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Configuring \texttt {xschemrc}}{4}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Create a Working Directory}{4}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Launching Xschem}{4}{section.3}%
+\contentsline {section}{\numberline {4}The Xschem Interface}{5}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Mouse Buttons}{5}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Entering Commands}{5}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Selection and Movement}{5}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Essential Command Reference}{6}{section.5}%
+\contentsline {subsection}{\numberline {5.1}File and View Commands}{6}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Drawing and Editing}{6}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Netlist and Simulation}{7}{subsection.5.3}%
+\contentsline {section}{\numberline {6}gf180mcuD Symbol Reference}{7}{section.6}%
+\contentsline {section}{\numberline {7}Ports, Labels, and Hierarchy}{8}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Ports vs.\ Labels}{8}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Naming Conventions}{8}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Creating a Symbol from a Schematic}{8}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Descending and Ascending the Hierarchy}{8}{subsection.7.4}%
+\contentsline {section}{\numberline {8}Step-by-Step: CMOS Inverter Schematic in gf180mcuD}{9}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Transistor Sizing}{9}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Step 1 --- Launch Xschem and Create a New Schematic}{9}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Step 2 --- Place the nMOS Transistor}{9}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Step 3 --- Place the pMOS Transistor}{9}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Step 4 --- Place Power, Ground, and Substrate Connections}{10}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}Step 5 --- Draw the Wires}{10}{subsection.8.6}%
+\contentsline {subsection}{\numberline {8.7}Step 6 --- Add Port Symbols}{10}{subsection.8.7}%
+\contentsline {subsection}{\numberline {8.8}Step 7 --- Add Labels for Power and Ground}{10}{subsection.8.8}%
+\contentsline {subsection}{\numberline {8.9}Step 8 --- Save}{11}{subsection.8.9}%
+\contentsline {subsection}{\numberline {8.10}Step 9 --- Generate the Symbol}{11}{subsection.8.10}%
+\contentsline {section}{\numberline {9}Building a Testbench}{11}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Step 1 --- New Schematic}{11}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Step 2 --- Instantiate the Inverter}{11}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Step 3 --- Add the Supply}{11}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Step 4 --- Add the Input Stimulus}{11}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Step 5 --- Add Simulator Directives}{12}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}Step 6 --- Generate the Netlist}{12}{subsection.9.6}%
+\contentsline {subsection}{\numberline {9.7}Step 7 --- Run the Simulation}{12}{subsection.9.7}%
+\contentsline {section}{\numberline {10}Netlist Generation in Detail}{12}{section.10}%
+\contentsline {section}{\numberline {11}Simulation with ngspice}{13}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Common Analyses}{13}{subsection.11.1}%
+\contentsline {section}{\numberline {12}Schematic vs.\ Layout (LVS Workflow)}{13}{section.12}%
+\contentsline {section}{\numberline {13}Tips and Common Pitfalls}{14}{section.13}%
+\contentsline {section}{\numberline {14}Quick-Reference Cheat Sheet}{15}{section.14}%
+\contentsline {section}{Additional Resources}{16}{lstnumber.-19.2}%

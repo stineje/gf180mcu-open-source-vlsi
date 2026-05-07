@@ -1,0 +1,1052 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xurl}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = blue!60!black,
+  urlcolor   = blue!60!black,
+  citecolor  = blue!60!black,
+}
+
+% --- Code listing style -------------------------------------------------------
+\definecolor{shellbg}{HTML}{F5F5F5}
+\definecolor{shellrule}{HTML}{CCCCCC}
+\definecolor{shellcomment}{HTML}{6A737D}
+\definecolor{shellkeyword}{HTML}{005CC5}
+
+\lstdefinestyle{shell}{
+  basicstyle      = \ttfamily\footnotesize,
+  backgroundcolor = \color{shellbg},
+  frame           = single,
+  rulecolor       = \color{shellrule},
+  framesep        = 6pt,
+  xleftmargin     = 6pt,
+  xrightmargin    = 6pt,
+  breaklines      = true,
+  showstringspaces= false,
+  columns         = fullflexible,
+  keepspaces      = true,
+  commentstyle    = \color{shellcomment}\itshape,
+  keywordstyle    = \color{shellkeyword}\bfseries,
+  morecomment     = [l]{\#},
+  morekeywords    = {xschem, ngspice, magic, netgen, klayout, export, source,
+                     cd, git, sudo, apt-get, dnf, tran, dc, ac, plot, run},
+  literate        = {/}{{/}}1 {-}{{-}}1 {=}{{=}}1,
+}
+\lstset{style=shell}
+
+% --- Tip / Warning boxes ------------------------------------------------------
+\newtcolorbox{tipbox}{
+  colback  = blue!5!white,
+  colframe = blue!60!black,
+  fonttitle= \bfseries,
+  title    = Tip,
+  breakable,
+}
+\newtcolorbox{warnbox}{
+  colback  = orange!8!white,
+  colframe = orange!80!black,
+  fonttitle= \bfseries,
+  title    = Important,
+  breakable,
+}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.5em}{}
+
+% ==============================================================================
+\title{A Practical Tutorial for Xschem Schematic Capture\\[4pt]
+       \large Using the GlobalFoundries 180\,nm PDK (\texttt{gf180mcuD})}
+\author{James E.\ Stine and Landon Burleson\\
+        Oklahoma State University\\
+        Electrical and Computer Engineering Department\\
+        Stillwater, OK 74078 USA\\
+        \texttt{james.stine@okstate.edu}}
+\date{\today}
+% ==============================================================================
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ==============================================================================
+\section{Introduction}
+% ==============================================================================
+
+Xschem is an open-source schematic capture and netlist generation tool
+originally developed by Stefan Schippers and now maintained at
+\url{https://xschem.sourceforge.io}.
+It is the de facto schematic editor for the open-source analog/mixed-signal
+IC design flow, providing fast hierarchical schematic entry, parameterized
+symbol creation, and direct integration with ngspice, Xyce, and other
+SPICE-class simulators.
+Xschem receives frequent updates; always prefer version 3.4 or later.
+
+This tutorial targets the \textbf{GlobalFoundries 180\,nm MCU PDK}
+(\texttt{gf180mcuD}), an open-source process development kit available
+through the \texttt{open\_pdks} installer and supported by Google's
+open-silicon initiative.
+The \texttt{gf180mcuD} library provides Xschem-ready symbols for nMOS,
+pMOS, resistors, capacitors, BJTs, and diodes, along with model files for
+ngspice simulation.
+All symbol names, parameter conventions, and command examples in this
+document refer to \texttt{gf180mcuD} unless otherwise noted.
+
+\begin{tipbox}
+Always sketch your schematic on paper or a whiteboard before opening
+Xschem.
+A clean schematic is a planning artifact, not a drawing exercise:
+spending five minutes thinking through power and ground placement,
+signal flow, and naming conventions will save you hours of rewiring,
+deleting, and renaming inside the editor.
+A good rule is \emph{signals flow left-to-right, supplies run top
+(VDD) to bottom (GND), and inputs land on the left edge while outputs
+exit on the right.}
+Once that mental layout is fixed, schematic entry becomes mechanical.
+\end{tipbox}
+
+% ==============================================================================
+\section{Prerequisites and Setup}
+% ==============================================================================
+
+\subsection{Software}
+
+You need Xschem (3.4+), ngspice (40+), and \texttt{open\_pdks} with
+\texttt{gf180mcuD} installed.
+If you are using the IIC-OSIC-TOOLS Docker container
+(\url{https://github.com/iic-jku/iic-osic-tools}), all of this is
+pre-installed and pre-configured---skip ahead to
+Section~\ref{sec:launching-xschem}.
+
+For a native Linux build, follow the accompanying installation guide
+and confirm that the following environment variables are set
+(\texttt{setup.sh} handles this automatically):
+
+\begin{lstlisting}
+export OPEN_CIRCUITDESIGN_ROOT="$HOME/ocd"
+export PDK_ROOT="$OPEN_CIRCUITDESIGN_ROOT/share/pdk"
+export PDK=gf180mcuD
+\end{lstlisting}
+
+\subsection{Environment Check}
+
+Before starting any design work, verify that Xschem can see the PDK
+symbols:
+
+\begin{lstlisting}
+ls $PDK_ROOT/gf180mcuD/libs.tech/xschem/
+# Should list: gf180mcu, sources, simulator_commands, etc.
+\end{lstlisting}
+
+If the directory is empty or missing, re-run \texttt{open\_pdks} for
+\texttt{gf180mcuD} or verify that \texttt{PDK\_ROOT} is set correctly.
+
+\subsection{Configuring \texttt{xschemrc}}
+
+Xschem reads its configuration from an \texttt{xschemrc} file, which
+tells the tool where to find PDK symbol libraries, simulation models,
+and your personal designs.
+The PDK ships with one ready to use:
+
+\begin{lstlisting}
+ls $PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc
+\end{lstlisting}
+
+You can either invoke Xschem with that file directly or copy it to
+\texttt{\textasciitilde/.xschem/xschemrc} and customize the
+\texttt{XSCHEM\_LIBRARY\_PATH} variable to include your own design
+directories.
+
+\subsection{Create a Working Directory}
+
+Organize each design in its own directory to avoid file collisions:
+
+\begin{lstlisting}
+mkdir -p ~/designs/inverter
+cd ~/designs/inverter
+\end{lstlisting}
+
+% ==============================================================================
+\section{Launching Xschem}
+\label{sec:launching-xschem}
+% ==============================================================================
+
+Always launch Xschem with the \texttt{gf180mcuD} configuration so that
+the correct symbol libraries and simulation models are loaded:
+
+\begin{lstlisting}
+xschem --rcfile $PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc
+\end{lstlisting}
+
+Xschem opens two windows simultaneously:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Schematic (drawing) window} --- where you place
+        components and draw wires.
+  \item \textbf{Terminal (console) window} --- the shell where Xschem
+        was launched, which displays netlist generation messages,
+        simulator output, and all error/warning text.
+\end{itemize}
+
+\begin{warnbox}
+Keep \emph{both} windows visible at all times.
+Symbol-load failures, parameter parsing errors, and simulator messages
+appear \emph{only} in the terminal window.
+The schematic window will look completely normal even when serious
+problems exist---a missing model file, a malformed parameter, or a
+simulation that exited immediately leaves no visible artifact in the
+schematic itself.
+The \emph{only} indication that something has gone wrong is a message
+in the terminal.
+A few practical habits follow from this:
+\begin{itemize}
+\item \textbf{After every netlist generation} (\texttt{Netlist} menu or
+      pressing \texttt{N}), glance at the terminal before continuing.
+\item \textbf{After launching a simulation}, scroll through the full
+      ngspice output rather than stopping at the first ``OK'' line.
+\item \textbf{When behavior seems wrong}---a component appears blank, a
+      simulation produces no waveforms, or a launch button does
+      nothing---the explanation is almost always already waiting in the
+      terminal window.
+\end{itemize}
+Treat the terminal not as a log to be consulted occasionally, but as a
+live diagnostic stream that runs in parallel with everything you do.
+\end{warnbox}
+
+% ==============================================================================
+\section{The Xschem Interface}
+% ==============================================================================
+
+\subsection{Mouse Buttons}
+
+The mouse is your primary schematic instrument.
+Learn these three actions before anything else:
+
+\begin{center}
+\begin{tabular}{@{}llp{8cm}@{}}
+\toprule
+\textbf{Button} & \textbf{Shorthand} & \textbf{Action} \\
+\midrule
+Left click   & L & Place an instance, end a wire, or select an item \\
+Middle click & M & Pan the view; drag with middle-button to pan freely \\
+Right click  & R & Open the context menu (properties, delete, copy, etc.) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The mouse wheel zooms in and out about the cursor location.
+A drag with left-click on empty canvas creates a rubber-band selection
+rectangle---everything fully enclosed becomes selected.
+
+\begin{tipbox}
+Get used to right-clicking on instances and wires.
+The context menu is the fastest path to editing properties, copying
+selections, and deleting items, and it always shows you only the
+operations that are valid for the object under the cursor.
+\end{tipbox}
+
+\subsection{Entering Commands}
+
+Xschem combines several input modes:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Single-character keyboard macros} typed in the
+        schematic window (e.g., \texttt{w} starts a wire,
+        \texttt{Insert} opens the symbol browser, \texttt{f} fits the
+        view).
+  \item \textbf{Menu commands} from the top menu bar (File, Edit, View,
+        Symbol, Simulation, etc.).
+  \item \textbf{Mouse actions} for placement, selection, and panning.
+\end{enumerate}
+
+The most important macros to learn first are \texttt{Insert} (place a
+new instance), \texttt{w} (wire), \texttt{l} (label/wire name),
+\texttt{Escape} (cancel current operation), and \texttt{Ctrl+s} (save).
+
+\subsection{Selection and Movement}
+
+Click to select a single object.
+Hold \texttt{Shift} and click to add to the selection, or drag a
+rubber-band rectangle to select a region.
+Move selected items with \texttt{m}, copy them with \texttt{c}, and
+delete them with \texttt{Delete}.
+Press \texttt{Escape} at any time to cancel the current operation
+without committing changes.
+\clearpage
+
+\begin{warnbox}
+A common source of confusion is starting a wire with \texttt{w} and
+then accidentally beginning to type a label or instance name into the
+schematic window.
+Xschem captures every keystroke as a potential macro, so what you
+\emph{think} is text entry can instead trigger another command---moving,
+deleting, or rotating the selection unexpectedly.
+If something stops working as expected---a click produces no result, or
+the cursor seems stuck in some other mode---press \texttt{Escape} once
+or twice to return to the default state before doing anything else.
+Make it a habit to press \texttt{Escape} between distinct operations,
+particularly after wire drawing, label placement, or property editing.
+\end{warnbox}
+
+% ==============================================================================
+\section{Essential Command Reference}
+% ==============================================================================
+
+\subsection{File and View Commands}
+
+\begin{center}
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+\textbf{Command/Key} & \textbf{Description} \\
+\midrule
+\texttt{Ctrl+s}                & Save current schematic \\
+\texttt{Ctrl+o}                & Open existing schematic \\
+\texttt{Ctrl+n}                & New empty schematic in a fresh window \\
+\texttt{Ctrl+q}                & Quit Xschem \\
+\texttt{f}                     & Fit all geometry to window (zoom-fit) \\
+\texttt{z} / \texttt{Z}        & Zoom in / zoom out about the cursor \\
+\texttt{Ctrl+e}                & Edit (descend into) the selected
+                                 instance's schematic \\
+\texttt{Ctrl+i}                & Edit (descend into) the selected
+                                 instance's symbol \\
+\texttt{Ctrl+a}                & Select all \\
+\texttt{Esc}                   & Cancel current operation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Drawing and Editing}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Action}            & \textbf{Macro}    & \textbf{Description} \\
+\midrule
+Place new instance         & \texttt{Insert}   & Open symbol browser to
+                                                 place a component \\
+Draw wire                  & \texttt{w}        & Start a wire; left-click
+                                                 to add vertices \\
+Place label/wire name      & \texttt{l}        & Insert a net label
+                                                 (\texttt{lab\_pin}) \\
+Place text annotation      & \texttt{t}        & Add free-form text
+                                                 (non-electrical) \\
+Move selection             & \texttt{m}        & Move selected items \\
+Copy selection             & \texttt{c}        & Copy selected items \\
+Rotate selection           & \texttt{r}        & Rotate 90$^\circ$
+                                                 counter-clockwise \\
+Flip selection             & \texttt{Shift+f}  & Mirror selection \\
+Delete selection           & \texttt{Delete}   & Remove selected items \\
+Edit properties            & \texttt{q}        & Open property dialog
+                                                 for selected instance \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Netlist and Simulation}
+
+\begin{center}
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+\textbf{Macro/Menu}         & \textbf{Description} \\
+\midrule
+\texttt{Netlist}            & Generate a SPICE netlist for the current
+                              schematic \\
+\texttt{Simulate}           & Launch the configured simulator (ngspice
+                              by default) on the netlist \\
+\texttt{a}                  & Show/hide net annotations after a
+                              simulation \\
+\texttt{Edit netlist}       & Open the most recent netlist in your
+                              editor for inspection \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \texttt{Options} menu lets you switch netlist format between SPICE,
+Verilog, VHDL, and tEDAx.
+For \texttt{gf180mcuD} simulation work, leave it on SPICE.
+
+% ==============================================================================
+\section{gf180mcuD Symbol Reference}
+% ==============================================================================
+
+The PDK provides Xschem symbols for every primitive device.
+The most commonly used symbols for digital and mixed-signal cell design
+are listed below; the \emph{Symbol path} is what appears in the
+\texttt{Insert} symbol browser.
+
+\begin{center}
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+\textbf{Symbol Path}                          & \textbf{Description} \\
+\midrule
+\texttt{gf180mcu/nfet\_03v3}                  & Standard 3.3\,V nMOS
+                                                transistor \\
+\texttt{gf180mcu/pfet\_03v3}                  & Standard 3.3\,V pMOS
+                                                transistor \\
+\texttt{gf180mcu/nfet\_06v0}                  & 5.0\,V (6\,V tolerant)
+                                                nMOS \\
+\texttt{gf180mcu/pfet\_06v0}                  & 5.0\,V (6\,V tolerant)
+                                                pMOS \\
+\texttt{gf180mcu/res\_*}                      & Resistor primitives
+                                                (poly, metal, diffusion) \\
+\texttt{gf180mcu/cap\_*}                      & Capacitor primitives
+                                                (MIM, MOS, MOM) \\
+\texttt{gf180mcu/diode\_*}                    & Diode primitives \\
+\texttt{devices/ipin}                         & Schematic input port
+                                                (left edge of cell) \\
+\texttt{devices/opin}                         & Schematic output port
+                                                (right edge of cell) \\
+\texttt{devices/iopin}                        & Bidirectional port \\
+\texttt{devices/lab\_pin}                     & Net-name label \\
+\texttt{devices/gnd}                          & Ground symbol \\
+\texttt{devices/vsource}                      & Voltage source \\
+\texttt{devices/code\_shown}                  & Inline SPICE code block
+                                                (for \texttt{.tran},
+                                                \texttt{.include}, etc.) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tipbox}
+\textbf{Use the right transistor flavor for your supply.}
+\texttt{gf180mcuD} provides separate device families for 3.3\,V and
+5\,V operation.
+Mixing them in a single design is allowed---and often necessary for
+mixed-signal interfaces---but each device must operate within its rated
+\(V_{ds}\), \(V_{gs}\), and \(V_{bs}\) limits or it will degrade quickly
+in silicon.
+For most digital cell work in \texttt{gf180mcuD}, the 3.3\,V family
+(\texttt{nfet\_03v3} and \texttt{pfet\_03v3}) is the correct choice.
+Reach for the 5\,V devices only when an interface specifically requires
+them.
+\end{tipbox}
+
+% ==============================================================================
+\section{Ports, Labels, and Hierarchy}
+% ==============================================================================
+
+\subsection{Ports vs.\ Labels}
+
+Xschem distinguishes between two kinds of named connections:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Ports} (\texttt{ipin}, \texttt{opin}, \texttt{iopin})
+        define the external interface of a cell.
+        When you generate a symbol from this schematic, every port
+        becomes a pin on the symbol.
+  \item \textbf{Labels} (\texttt{lab\_pin}) name internal nets so they
+        can be referred to by name elsewhere in the same schematic, or
+        so they appear meaningfully in the netlist.
+\end{itemize}
+
+A single net can carry multiple labels with the same name; Xschem
+treats them as electrically connected even without a visible wire.
+This is the standard way to wire up power and ground rails without
+cluttering the schematic.
+
+\subsection{Naming Conventions}
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{\texttt{VDD}} and \textbf{\texttt{VSS}}
+        (or \textbf{\texttt{GND}}) --- supply rails.
+        Use the same names as in your testbench and any other
+        cells you intend to instantiate.
+  \item Signal names must match between the schematic and its companion
+        layout for LVS to pass; use exactly the same capitalization.
+  \item Adopt a consistent style within a project---\texttt{a},
+        \texttt{b}, \texttt{y}, \texttt{clk}, \texttt{rst}, etc.---and
+        keep it everywhere.
+\end{itemize}
+
+\begin{tipbox}
+\textbf{Match labels to the schematic of the surrounding system.}
+A net labeled \texttt{Y} in your inverter must connect to a net also
+labeled \texttt{Y} in any cell that uses it.
+LVS, top-level netlist generation, and inter-cell wiring all depend on
+character-for-character label matches.
+A net labeled \texttt{vdd} will not connect to a net labeled
+\texttt{VDD}, and Xschem will not warn you about the mismatch---it will
+simply produce a netlist with two disconnected supplies.
+\end{tipbox}
+
+\subsection{Creating a Symbol from a Schematic}
+
+Every schematic with ports can be turned into a symbol that other
+schematics can instantiate.
+With your schematic open, choose \textbf{Symbol $\rightarrow$ Make
+symbol from schematic} (or press \texttt{a} from the menu shortcut).
+Xschem auto-generates a rectangular symbol with one pin per port,
+saved as \texttt{<name>.sym} alongside your \texttt{<name>.sch}.
+After that, instantiate it from another schematic with \texttt{Insert}
+and browse to your working directory.
+
+\subsection{Descending and Ascending the Hierarchy}
+
+Select an instance and press \texttt{Ctrl+e} to descend into its
+schematic, or \texttt{Ctrl+i} to descend into its symbol drawing.
+Press \texttt{Ctrl+e} again on empty canvas (or use the \texttt{<<}
+button on the toolbar) to ascend back to the parent.
+
+% ==============================================================================
+\section{Step-by-Step: CMOS Inverter Schematic in gf180mcuD}
+% ==============================================================================
+
+This section walks through drawing a minimum-size CMOS inverter from
+scratch in \texttt{gf180mcuD}.
+Have your sketch ready before you begin.
+
+\subsection{Transistor Sizing}
+
+In \texttt{gf180mcuD} the minimum drawn gate length is
+$L_{\min} = 0.18\,\mu\text{m}$.
+A reasonable starting inverter uses:
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Transistor} & \textbf{Type} & \textbf{Width} & \textbf{Length} \\
+\midrule
+nMOS & \texttt{nfet\_03v3} & $0.42\,\mu\text{m}$ & $0.18\,\mu\text{m}$ \\
+pMOS & \texttt{pfet\_03v3} & $0.84\,\mu\text{m}$ ($2\times$ nMOS) & $0.18\,\mu\text{m}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The pMOS is sized $2\times$ wider than the nMOS to equalize rise and
+fall times, since hole mobility is roughly half that of electrons.
+
+\subsection{Step 1 --- Launch Xschem and Create a New Schematic}
+
+\begin{lstlisting}
+cd ~/designs/inverter
+xschem --rcfile $PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc
+\end{lstlisting}
+
+In the schematic window, press \texttt{Ctrl+n} to open a new empty
+schematic.
+Save it immediately so all subsequent operations have a target file:
+
+\begin{lstlisting}
+File -> Save As ...   # save as inv.sch in ~/designs/inverter
+\end{lstlisting}
+
+\subsection{Step 2 --- Place the nMOS Transistor}
+
+Press \texttt{Insert} to open the symbol browser, then navigate to
+\texttt{gf180mcu/nfet\_03v3} and double-click to attach it to the
+cursor.
+Left-click in the lower half of the canvas to place it.
+Press \texttt{Escape} to exit placement mode.
+
+Select the placed instance, press \texttt{q} to open its properties,
+and set:
+
+\begin{lstlisting}
+W = 0.42u
+L = 0.18u
+nf = 1
+\end{lstlisting}
+
+\subsection{Step 3 --- Place the pMOS Transistor}
+
+Press \texttt{Insert} again, navigate to \texttt{gf180mcu/pfet\_03v3},
+and place it directly above the nMOS.
+Edit its properties (\texttt{q}):
+
+\begin{lstlisting}
+W = 0.84u
+L = 0.18u
+nf = 1
+\end{lstlisting}
+
+\subsection{Step 4 --- Place Power, Ground, and Substrate Connections}
+
+A MOSFET symbol in the PDK has four terminals: drain, gate, source, and
+body.
+The body terminals must be tied to the appropriate supply for correct
+operation:
+
+\begin{itemize}[leftmargin=2em]
+  \item nMOS body $\rightarrow$ \texttt{VSS} (ground).
+  \item pMOS body (n-well) $\rightarrow$ \texttt{VDD}.
+\end{itemize}
+
+The simplest way to make these connections is to label the body wires
+with \texttt{VDD} and \texttt{VSS} so they connect by name instead of
+running explicit wires.
+
+\subsection{Step 5 --- Draw the Wires}
+
+Press \texttt{w} to enter wire mode and connect:
+
+\begin{itemize}[leftmargin=2em]
+  \item pMOS source $\rightarrow$ \texttt{VDD} rail.
+  \item nMOS source $\rightarrow$ \texttt{VSS} rail.
+  \item pMOS drain + nMOS drain $\rightarrow$ output node.
+  \item pMOS gate + nMOS gate $\rightarrow$ input node.
+\end{itemize}
+
+Click each vertex of the wire path; double-click or press \texttt{Esc}
+to finish.
+Wires snap to the grid automatically and form T-junctions wherever they
+cross other wires at vertices.
+
+\begin{tipbox}
+\textbf{Always wire on grid.}
+Xschem will not connect two wires that pass each other off-grid,
+even if they look connected on screen.
+If a node refuses to take a label or shows up disconnected after
+netlisting, the most common cause is one endpoint sitting half a grid
+unit off.
+Press \texttt{f} to fit, then zoom in (\texttt{z}) on the suspected
+junction and verify both endpoints are exactly on grid intersections.
+\end{tipbox}
+
+\subsection{Step 6 --- Add Port Symbols}
+
+Press \texttt{Insert}, browse to \texttt{devices/ipin}, and place an
+input pin on the input wire.
+Edit its properties (\texttt{q}) and set:
+
+\begin{lstlisting}
+name = A
+\end{lstlisting}
+
+Repeat with \texttt{devices/opin} on the output wire, naming it
+\texttt{Y}.
+These ports define the external interface of the cell---when you
+generate a symbol later, \texttt{A} and \texttt{Y} become the input
+and output pins.
+
+\subsection{Step 7 --- Add Labels for Power and Ground}
+
+Press \texttt{Insert}, browse to \texttt{devices/lab\_pin}, and place
+labels on the supply wires:
+
+\begin{lstlisting}
+name = VDD       # on the upper rail and pMOS body
+name = VSS       # on the lower rail and nMOS body
+\end{lstlisting}
+
+Anywhere two \texttt{lab\_pin} instances share the same name, Xschem
+treats the wires they sit on as electrically connected---even with no
+visible wire between them.
+
+\subsection{Step 8 --- Save}
+
+\begin{lstlisting}
+Ctrl+s
+\end{lstlisting}
+
+This writes \texttt{inv.sch} to your working directory.
+Save frequently; Xschem does not auto-save.
+
+\subsection{Step 9 --- Generate the Symbol}
+
+With the schematic saved, choose \textbf{Symbol $\rightarrow$ Make
+symbol from schematic}.
+Xschem creates \texttt{inv.sym} in the same directory, ready to be
+instantiated by a testbench or higher-level cell.
+
+\begin{warnbox}
+If you later add, remove, or rename ports, regenerate the symbol.
+A schematic and its symbol can drift out of sync silently---an
+\texttt{ipin} added to the schematic will not appear on the symbol
+until you regenerate it, and any cell that already instantiated the old
+symbol will continue to use the old pin list with no warning.
+Make symbol regeneration part of your save workflow whenever the port
+list changes.
+\end{warnbox}
+
+% ==============================================================================
+\section{Building a Testbench}
+% ==============================================================================
+
+A testbench schematic instantiates the cell under test, applies stimulus,
+and includes the simulator directives needed to run a particular
+analysis.
+This section builds a minimal inverter testbench.
+
+\subsection{Step 1 --- New Schematic}
+
+Start a fresh schematic with \texttt{Ctrl+n} and save it as
+\texttt{inv\_tb.sch} in the same directory as \texttt{inv.sch}.
+
+\subsection{Step 2 --- Instantiate the Inverter}
+
+Press \texttt{Insert} and browse to your working directory rather than
+the PDK library.
+Select \texttt{inv.sym} and place it in the center of the canvas.
+
+\subsection{Step 3 --- Add the Supply}
+
+Place a \texttt{devices/vsource} symbol, set its properties to
+\texttt{value = 3.3} and \texttt{name = VDD}, and wire its positive
+terminal to a label \texttt{VDD} and its negative terminal to a label
+\texttt{VSS}.
+Place a \texttt{devices/gnd} symbol on the \texttt{VSS} node so that
+ngspice has a defined zero-volt reference.
+
+\subsection{Step 4 --- Add the Input Stimulus}
+
+Place another \texttt{devices/vsource} on input \texttt{A}.
+Edit its properties:
+
+\begin{lstlisting}
+name  = VIN
+value = pulse(0 3.3 0 100p 100p 5n 10n)
+\end{lstlisting}
+
+This drives \texttt{A} with a 100\,MHz pulse train (10\,ns period,
+50\% duty cycle, 100\,ps edges).
+The negative terminal connects to \texttt{VSS}.
+
+\subsection{Step 5 --- Add Simulator Directives}
+
+Place a \texttt{devices/code\_shown} symbol anywhere on the canvas.
+Edit its \texttt{value} property to contain the simulation control
+deck:
+
+\begin{lstlisting}
+.lib "$PDK_ROOT/gf180mcuD/libs.tech/ngspice/design.ngspice" typical
+.tran 10p 50n
+.save all
+.control
+run
+plot v(A) v(Y)
+.endc
+\end{lstlisting}
+
+The first line includes the typical-corner device models for
+\texttt{gf180mcuD}.
+The \texttt{.tran} directive runs a 50\,ns transient with 10\,ps
+internal time steps, the \texttt{.save all} stores every node, and the
+\texttt{.control} block automatically plots the input and output once
+the simulation finishes.
+
+\subsection{Step 6 --- Generate the Netlist}
+
+Press \texttt{N} (or use \textbf{Simulation $\rightarrow$ Netlist}).
+Xschem writes \texttt{inv\_tb.spice} to the working directory and
+prints any errors to the terminal.
+
+\subsection{Step 7 --- Run the Simulation}
+
+Press the \textbf{Simulate} button (or use the \textbf{Simulation}
+menu).
+Xschem launches ngspice on the netlist; ngspice runs in a console and
+opens a plot window with the requested waveforms.
+
+\begin{tipbox}
+\textbf{Re-netlist before every simulation.}
+Xschem does not automatically regenerate the netlist when you change
+the schematic.
+A common debugging trap is to edit the schematic, hit Simulate, and see
+exactly the same (broken) result as before---because ngspice ran the
+old netlist.
+Make \texttt{N} (netlist) a reflex before \texttt{Simulate}, or use the
+\textbf{Netlist + Simulate} menu option that does both in one step.
+\end{tipbox}
+
+% ==============================================================================
+\section{Netlist Generation in Detail}
+% ==============================================================================
+
+The netlist Xschem generates is a plain-text SPICE file usable directly
+by ngspice, Xyce, or any other Berkeley-compatible simulator.
+You can inspect it with any text editor:
+
+\begin{lstlisting}
+cat inv_tb.spice
+\end{lstlisting}
+
+Useful options under the \textbf{Options} menu:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Spice netlist}: standard SPICE output (default).
+  \item \textbf{Hierarchical netlist}: emits subcircuit definitions
+        (\texttt{.subckt}) for every cell rather than flattening.
+        Required for any design with more than one level of hierarchy.
+  \item \textbf{Top-level is subckt}: wraps the top schematic itself
+        in a \texttt{.subckt} block so it can be reused.
+        Leave this off for testbenches.
+\end{itemize}
+
+\begin{warnbox}
+For LVS-clean cell design, always use the hierarchical netlister.
+A flattened netlist destroys the cell-by-cell structure that LVS tools
+rely on to compare your schematic against the layout.
+Magic's \texttt{.spice} extraction is hierarchical by default; your
+schematic netlist must match.
+\end{warnbox}
+
+% ==============================================================================
+\section{Simulation with ngspice}
+% ==============================================================================
+
+When Xschem launches ngspice, you get an interactive console where you
+can issue additional commands after the initial \texttt{.control} block
+finishes:
+
+\begin{lstlisting}
+ngspice 1 -> plot v(A) v(Y)
+ngspice 2 -> meas tran t_pdr trig v(A) val=1.65 fall=1 \
+                                targ v(Y) val=1.65 rise=1
+ngspice 3 -> meas tran t_pdf trig v(A) val=1.65 rise=1 \
+                                targ v(Y) val=1.65 fall=1
+ngspice 4 -> let t_pd = (t_pdr + t_pdf) / 2
+ngspice 5 -> print t_pd
+\end{lstlisting}
+
+These four \texttt{meas} statements compute the rising-edge propagation
+delay (\texttt{t\_pdr}), falling-edge propagation delay
+(\texttt{t\_pdf}), and their average (\texttt{t\_pd}) for the inverter.
+
+\subsection{Common Analyses}
+
+\begin{center}
+\begin{tabular}{@{}lp{8.5cm}@{}}
+\toprule
+\textbf{Directive} & \textbf{Purpose} \\
+\midrule
+\texttt{.tran 10p 50n}        & Transient: 10\,ps step, 50\,ns stop \\
+\texttt{.dc VIN 0 3.3 0.01}   & DC sweep of \texttt{VIN} from 0 to
+                                3.3\,V in 10\,mV steps \\
+\texttt{.ac dec 10 1 1G}      & AC sweep, 10 points per decade,
+                                1\,Hz to 1\,GHz \\
+\texttt{.noise v(out) VIN dec 10 1 1G}
+                              & Noise analysis at output referred to
+                                \texttt{VIN} \\
+\texttt{.op}                  & DC operating point only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For a simple voltage-transfer-curve plot of an inverter, use
+\texttt{.dc} sweeping the input source rather than \texttt{.tran}.
+Pulse stimuli can be useful but are unnecessary for static
+characterization.
+
+% ==============================================================================
+\section{Schematic vs.\ Layout (LVS Workflow)}
+% ==============================================================================
+
+Once your schematic simulates correctly, the SPICE netlist Xschem
+generates becomes the reference for Layout vs.\ Schematic (LVS)
+comparison against the corresponding Magic layout.
+Many professional organizations list skipping LVS as a termination
+offense.
+
+A typical workflow:
+
+\begin{enumerate}[leftmargin=2em]
+  \item In Xschem, generate a hierarchical netlist of the cell
+        (\emph{not} the testbench): \texttt{Options $\rightarrow$
+        Hierarchical netlist}, then \texttt{Netlist}.
+  \item In Magic, extract the layout to SPICE
+        (\texttt{:extract all; :ext2spice}).
+  \item Run Netgen with the PDK setup file:
+\begin{lstlisting}
+netgen -batch lvs "inv.spice inv" \
+    "$PDK_ROOT/gf180mcuD/libs.tech/netgen/gf180mcuD_setup.tcl"
+\end{lstlisting}
+  \item A passing comparison prints \textbf{Circuits match}.
+        A failure lists mismatched devices and nets---trace each one
+        back to a label or wiring error in either side.
+\end{enumerate}
+
+\begin{tipbox}
+The schematic is the \emph{golden} reference.
+If LVS fails, the layout is what changes---never edit the schematic to
+``match'' a faulty layout, since the schematic is what your simulation
+verified.
+The only exception is when the schematic itself is wrong relative to
+the design intent, in which case you fix the schematic, re-simulate,
+re-netlist, and re-run LVS from the top.
+\end{tipbox}
+
+% ==============================================================================
+\section{Tips and Common Pitfalls}
+% ==============================================================================
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Re-netlist before every simulation.}
+        Xschem does not automatically regenerate the netlist when you
+        edit the schematic.
+        Press \texttt{N} before \texttt{Simulate} every time, or use
+        the combined menu option.
+
+  \item \textbf{Match labels exactly.}
+        \texttt{VDD} and \texttt{vdd} are different nets.
+        Pick a convention (typically all-uppercase for supplies and
+        lowercase for signals) and follow it everywhere.
+
+  \item \textbf{Tie every body terminal.}
+        A floating MOSFET body produces nonsense simulation results
+        and an LVS failure.
+        Always label the body net to \texttt{VDD} (pMOS) or \texttt{VSS}
+        (nMOS) explicitly.
+
+  \item \textbf{Keep wires on grid.}
+        Off-grid wires look connected on screen but produce
+        disconnected nets in the netlist.
+        When in doubt, zoom in and verify each junction.
+
+  \item \textbf{Regenerate the symbol after port changes.}
+        Adding, removing, or renaming \texttt{ipin}/\texttt{opin}
+        instances does not automatically update the symbol file.
+        Use \textbf{Symbol $\rightarrow$ Make symbol from schematic}
+        whenever the port list changes.
+
+  \item \textbf{Use \texttt{code\_shown} for SPICE directives.}
+        Inline SPICE blocks (\texttt{.tran}, \texttt{.lib},
+        \texttt{.control}) belong in a \texttt{code\_shown} symbol on
+        the testbench schematic, not buried in the netlist.
+
+  \item \textbf{Save your testbench separately.}
+        Keep \texttt{<cell>.sch} and \texttt{<cell>\_tb.sch} as
+        independent files in the same directory.
+        The cell schematic stays clean and reusable; the testbench
+        carries the simulation setup.
+
+  \item \textbf{Read the terminal.}
+        Almost every diagnostic Xschem and ngspice produce appears in
+        the launching terminal, not in the GUI.
+        Make a habit of glancing at it after every netlist and
+        simulate.
+
+  \item \textbf{Use scripts.}
+        Repeated simulation runs, sweep generation, and corner-by-corner
+        netlisting are all scriptable from the Tcl console (open with
+        \textbf{Window $\rightarrow$ Tcl prompt}).
+        A small library of reusable Tcl snippets pays for itself
+        quickly.
+\end{itemize}
+
+% ==============================================================================
+\section{Quick-Reference Cheat Sheet}
+% ==============================================================================
+
+\subsection*{Keyboard Macros}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Key} & \textbf{Action} & \textbf{Notes} \\
+\midrule
+\texttt{Insert}  & Place new instance     & Opens symbol browser \\
+\texttt{w}       & Draw wire              & Click vertices; \texttt{Esc} to end \\
+\texttt{l}       & Place label            & Insert \texttt{lab\_pin} \\
+\texttt{t}       & Place text             & Non-electrical annotation \\
+\texttt{m}       & Move selection         & --- \\
+\texttt{c}       & Copy selection         & --- \\
+\texttt{r}       & Rotate $90^\circ$ CCW  & --- \\
+\texttt{Shift+f} & Flip                   & Mirror selection \\
+\texttt{q}       & Edit properties        & Of selected instance \\
+\texttt{Delete}  & Delete selection       & --- \\
+\texttt{f}       & Fit to window          & --- \\
+\texttt{z}/\texttt{Z} & Zoom in/out       & About cursor \\
+\texttt{Ctrl+e}  & Descend into schematic & Of selected instance \\
+\texttt{Ctrl+i}  & Descend into symbol    & Of selected instance \\
+\texttt{Ctrl+s}  & Save                   & --- \\
+\texttt{Ctrl+a}  & Select all             & --- \\
+\texttt{Esc}     & Cancel                 & Always safe \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Key Commands}
+
+\noindent To launch Xschem with the gf180mcuD configuration:
+\begin{lstlisting}
+xschem --rcfile $PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc
+\end{lstlisting}
+
+\noindent Alternatively, copy the PDK \texttt{xschemrc} to
+\texttt{\textasciitilde/.xschem/xschemrc} so Xschem loads it
+automatically every time:
+\begin{lstlisting}
+mkdir -p ~/.xschem
+cp $PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc ~/.xschem/xschemrc
+\end{lstlisting}
+\noindent With this in place, simply typing \texttt{xschem} from any
+directory will load the \texttt{gf180mcuD} symbol libraries without
+requiring the \texttt{--rcfile} argument each time.
+
+\begin{center}
+\begin{tabular}{@{}lp{7.5cm}@{}}
+\toprule
+\textbf{Menu/Action} & \textbf{Purpose} \\
+\midrule
+\texttt{Netlist}                    & Generate SPICE netlist for current
+                                      schematic \\
+\texttt{Simulate}                   & Run ngspice on the netlist \\
+\texttt{Symbol $\to$ Make symbol}   & Generate \texttt{.sym} from
+                                      \texttt{.sch} \\
+\texttt{Options $\to$ Hierarchical} & Toggle hierarchical netlister
+                                      (required for LVS) \\
+\texttt{Window $\to$ Tcl prompt}    & Open the Tcl scripting console \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Common Symbols for gf180mcuD}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Symbol path} & \textbf{What it places} \\
+\midrule
+\texttt{gf180mcu/nfet\_03v3}   & 3.3\,V nMOS \\
+\texttt{gf180mcu/pfet\_03v3}   & 3.3\,V pMOS \\
+\texttt{gf180mcu/res\_*}       & Resistor primitives \\
+\texttt{gf180mcu/cap\_*}       & Capacitor primitives \\
+\texttt{devices/ipin}          & Input port \\
+\texttt{devices/opin}          & Output port \\
+\texttt{devices/iopin}         & Bidirectional port \\
+\texttt{devices/lab\_pin}      & Net label \\
+\texttt{devices/gnd}           & Ground \\
+\texttt{devices/vsource}       & Voltage source \\
+\texttt{devices/code\_shown}   & SPICE directive block \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ==============================================================================
+\section*{Additional Resources}
+\addcontentsline{toc}{section}{Additional Resources}
+% ==============================================================================
+
+\begin{itemize}[leftmargin=2em]
+  \item Xschem manual and tutorials:
+        \url{https://xschem.sourceforge.io/stefan/index.html}
+  \item ngspice manual:
+        \url{https://ngspice.sourceforge.io/docs.html}
+  \item gf180mcuD PDK documentation:
+        \url{https://gf180mcu-pdk.readthedocs.io}
+  \item open\_pdks repository (PDK installer):
+        \url{https://github.com/RTimothyEdwards/open_pdks}
+  \item IIC-OSIC-TOOLS Docker container:
+        \url{https://github.com/iic-jku/iic-osic-tools}
+  \item Course examples, scripts, and schematic templates:
+        \url{https://stineje.github.io}
+  \item Video walkthroughs:
+        \url{https://www.youtube.com/user/jlstine/}
+\end{itemize}
+
+\end{document}
