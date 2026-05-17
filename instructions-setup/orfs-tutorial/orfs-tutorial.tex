@@ -1,0 +1,452 @@
+\documentclass[11pt]{article}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+
+% ---------- Hyperref setup ----------
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black,
+    pdftitle={Quick GF180 MCU Inverter Tutorial in the IIC-OSIC Container},
+    pdfauthor={James Stine}
+}
+
+% ---------- Listings setup for shell code ----------
+\definecolor{shellbg}{RGB}{245,245,245}
+\definecolor{shellrule}{RGB}{200,200,200}
+\definecolor{shellcomment}{RGB}{0,128,0}
+\definecolor{shellkeyword}{RGB}{0,0,180}
+
+\lstdefinestyle{shell}{
+    backgroundcolor=\color{shellbg},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    breakatwhitespace=false,
+    columns=fullflexible,
+    frame=single,
+    rulecolor=\color{shellrule},
+    showstringspaces=false,
+    keepspaces=true,
+    xleftmargin=0pt,
+    framexleftmargin=4pt,
+    framexrightmargin=4pt,
+    framextopmargin=4pt,
+    framexbottommargin=4pt,
+    aboveskip=8pt,
+    belowskip=8pt,
+    language=bash,
+    commentstyle=\color{shellcomment},
+    keywordstyle=\color{shellkeyword}\bfseries,
+}
+\lstset{style=shell}
+
+% ---------- Section formatting ----------
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+
+% ---------- Title ----------
+\title{Step-by-Step Tutorial for an Automated GF180MCU Digital Design Workflow}
+\author{Maryam Shahangian and James E. Stine \\
+        Oklahoma State University\\
+        Electrical and Computer Engineering Department\\
+        Stillwater, OK 74078 USA\\
+        \texttt{\{maryam.shahangian, james.stine\}@okstate.edu}}
+\date{}
+
+\begin{document}
+\maketitle
+
+% ============================================================
+\section{Introduction}
+
+The goal of this tutorial is to provide a simple, step-by-step workflow for running OpenROAD inside a containerized environment. The tutorial first introduces the basic concept of a container and explains why containerized environments are useful for digital design workflows. A container provides a ready-to-use environment in which the required design tools are already installed and configured. As a result, users do not need to manually install tools or resolve software dependency issues.
+
+The tutorial then demonstrates how OpenROAD can automate the major stages of a digital design flow. Rather than executing each stage manually, OpenROAD-flow-scripts can guide the design from RTL input through synthesis, place-and-route, and final GDSII layout generation.
+
+To demonstrate the workflow, the tutorial first uses an example design that is already included within OpenROAD. This provides a complete example of the design flow inside the container, beginning with the RTL design files and ending with the generated GDSII layout. Finally, the tutorial explains how the same flow can be adapted to use the
+\href{https://github.com/stineje/globalfoundries-pdk-libs-gf180mcu_osu_sc}{
+\textcolor{blue!70!black}{\textbf{OSU GF180}}
+}
+standard-cell library.
+
+% ============================================================
+\section{Understanding the Environment}
+
+In this tutorial, the design environment is provided through a containerized setup. This means that the chip-design tools are not installed directly on the host operating system. Instead, they are provided inside a prepared environment that can be launched consistently across different machines.
+In practical terms, the host computer remains the user's normal system, while the actual design workflow runs inside a preconfigured software environment containing the required tools, libraries, scripts, and dependencies.
+
+\subsection{What IIC-OSIC-TOOLS Is}
+
+\href{https://github.com/iic-jku/iic-osic-tools}{
+\textcolor{blue!70!black}{\textbf{IIC-OSIC-TOOLS}}
+} is the containerized tool environment used in this tutorial. It provides an integrated, ready-to-use platform for IC design, with the required tools already bundled together. This makes setup easier and avoids the need to install and configure each tool manually.
+
+\subsection{What Docker Does}
+
+Docker is the software used to launch and manage the prepared environment. In simple terms, the container is the workspace that already contains the design tools, while Docker is the software that creates, starts, and manages that workspace. In this tutorial, Docker is used to run the IIC-OSIC-TOOLS container so that the OpenROAD workflow can be executed in a consistent and reproducible environment.
+% ============================================================
+\section{Installing Docker}
+
+Docker Desktop installers are available for multiple operating systems and architectures. The official Docker download page provides installers for Windows, Linux, and macOS.
+In this tutorial, the documented setup was performed on Windows. Therefore, the following steps focus specifically on the Windows installation path and the continuation of the environment setup.
+
+\begin{enumerate}
+    \item Download Docker Desktop from the official Docker website for the appropriate operating system.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.80\textwidth]{1.png}
+    \caption{Docker Desktop download page for selecting the appropriate installer.}
+    \label{fig:docker-download}
+\end{figure}
+    
+    \item Follow the installation instructions provided by Docker Desktop to complete the installation on the host machine.
+\end{enumerate}
+
+After Docker Desktop is installed, select the preferred method for accessing the container environment. Three access modes are available:
+
+\begin{itemize}
+    \item \textbf{VNC Mode:} Provides a full graphical desktop environment that can be accessed through a web browser.
+
+    \item \textbf{Jupyter Mode:} Provides a web-based notebook environment useful for running commands, documenting steps, and working interactively.
+
+    \item \textbf{Shell Mode:} Provides a simple command-line terminal for running scripts and server-side tasks.
+\end{itemize}
+
+For this tutorial, Jupyter Mode is selected as the primary access method.
+
+\subsection{Select the Correct Chipathon Branch and Docker Image}
+
+After cloning the repository, 
+\begin{enumerate}
+    \item open Command Prompt (CMD) and run the following commands:
+
+\begin{lstlisting}
+cd %USERPROFILE%\eda\designs\iic-osic-tools
+\end{lstlisting}
+
+\begin{lstlisting}
+git checkout ieee_chipathon
+\end{lstlisting}
+
+This switches the repository to the branch used for the Chipathon setup.
+
+\item Next, set the Docker image tag and start Jupyter:
+
+\begin{lstlisting}
+SET DOCKER_TAG=chipathon26
+start_jupyter.bat
+\end{lstlisting}
+
+These commands switch to the Chipathon branch and start the Jupyter container using the Chipathon 26 image.
+
+\item If a Jupyter container was already created previously using an older image, remove it first and then start it again:
+
+\begin{lstlisting}
+docker rm -f iic-osic-tools_jupyter
+SET DOCKER_TAG=chipathon26
+start_jupyter.bat
+\end{lstlisting}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{7.png}
+    \caption{Successful startup of the Chipathon 26 Jupyter container in Command Prompt.}
+    \label{fig:jupyter-container-start}
+\end{figure}
+
+
+\item After that, open Docker Desktop. Click the Play button next to \texttt{iic-osic-tools\_jupyter} and wait a few seconds for the container to start.
+Once the container is running, go to the \textbf{Ports} column and click \texttt{8888:8888} to open the Jupyter environment in a web browser.
+\end{enumerate}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.90\textwidth]{2.png}
+    \caption{Docker Desktop showing the running Jupyter container and the available port link.}
+    \label{fig:docker-jupyter-port}
+  \vspace{0.2cm}
+    \centering
+    \includegraphics[width=0.50\textwidth]{3.png}
+    \caption{JupyterLab launcher page after the container starts successfully.}
+    \label{fig:jupyterlab-launcher}
+\end{figure}
+
+\textbf{Tip:} If the port number shown in Docker Desktop is not clickable, manually open a web browser and go to: \texttt{http://localhost:8888}
+
+For VNC mode, click the corresponding VNC port link in Docker Desktop, or manually open: \texttt{http://localhost:80}
+When prompted, enter the default password: \texttt{abc123}
+At this point, the JupyterLab interface should become visible in the browser, indicating that the container environment has started successfully and is ready for interactive use.
+The primary shared working directories are:
+
+\begin{itemize}
+    \item Windows:
+    \texttt{C:\textbackslash Users\textbackslash <username>\textbackslash eda\textbackslash designs}
+
+    \item Container:
+    \texttt{/foss/designs}
+\end{itemize}
+
+Use this folder for all files and designs throughout the tutorial.
+% ============================================================
+\subsection{Check the Installed Tools}
+
+To open a terminal in JupyterLab, go to the \textbf{Launcher} page and, under \textbf{Other}, click \textbf{Terminal}.
+Then run the following commands:
+
+\begin{lstlisting}
+cd /foss/designs && pwd && ls
+\end{lstlisting}
+
+To verify the installed tools and display the ORFS commit version, run:
+
+\begin{lstlisting}
+yosys -V
+\end{lstlisting}
+
+\begin{lstlisting}
+openroad -version
+\end{lstlisting}
+
+\begin{lstlisting}
+echo $TOOLS
+\end{lstlisting}
+
+\begin{lstlisting}
+cat $TOOLS/openroad/ORFS_COMMIT
+\end{lstlisting}
+
+These commands confirm that the required tools are available inside the container and display the matching ORFS commit used by the environment.
+
+\textbf{What Is an “Image”?}
+
+In Docker terminology, an image is a prebuilt software environment that already contains the required tools and dependencies.
+In this tutorial, the \textbf{Chipathon26} image is used. This image is distributed through the IIC-OSIC-TOOLS environment and maintained by Harald Pretl and collaborators. It already includes the main tools required for the workflow, such as OpenROAD and Yosys.
+
+\textbf{Why is the commit important?}
+
+The ORFS commit helps confirm that the OpenROAD-flow-scripts version matches the OpenROAD tools installed inside the container. This avoids compatibility problems caused by version mismatches.
+
+\subsection{Clone OpenROAD-flow-scripts}
+
+Next, clone the \href{https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git}{
+\textcolor{blue!70!black}{\textbf{OpenROAD-flow-scripts}}
+} repository and check out the commit version stored in the container image.
+
+\begin{lstlisting}
+cd /foss/designs
+\end{lstlisting}
+
+\begin{lstlisting}
+git clone https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+\end{lstlisting}
+
+\begin{lstlisting}
+cd OpenROAD-flow-scripts
+\end{lstlisting}
+
+\begin{lstlisting}
+git checkout $(cat $TOOLS/openroad/ORFS_COMMIT)
+\end{lstlisting}
+
+This ensures that the flow scripts match the OpenROAD tools provided by the container image.
+
+
+\subsubsection{Setting the Tool Paths}
+Now configure the tool paths so that the flow uses the OpenROAD and Yosys executables installed inside the container.
+
+\begin{lstlisting}
+cat >> ~/.bashrc <<'EOF'
+export YOSYS_EXE=/foss/tools/yosys/bin/yosys
+export OPENROAD_EXE=/foss/tools/openroad/bin/openroad
+export OPENSTA_EXE=/foss/tools/openroad/bin/sta
+EOF
+\end{lstlisting}
+
+\begin{lstlisting}
+source ~/.bashrc
+\end{lstlisting}
+
+This configuration step only needs to be performed once. Afterward, the terminal session will automatically recognize these tool paths.
+
+
+\textbf{Note:}
+In this setup, the flow scripts expect the executables to exist under the local \texttt{tools/install} directory. However, the Chipathon 26 container already provides these tools under \texttt{/foss/tools}.
+
+The following one-time setup creates symbolic links to the installed tools so that the OpenROAD flow can start normally.
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts
+mkdir -p tools/install
+ln -sfn /foss/tools/yosys tools/install/yosys
+ln -sfn /foss/tools/openroad tools/install/OpenROAD
+\end{lstlisting}
+
+
+
+\subsubsection{Run the Flow}
+
+Move to the flow directory and run:
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts/flow
+\end{lstlisting}
+
+\begin{lstlisting}
+make
+\end{lstlisting}
+
+This starts the OpenROAD flow using the tool versions provided by the current Chipathon 26 container image.
+At this stage, the OpenROAD environment inside the IIC-OSIC-TOOLS container is fully configured and ready for use.
+The environment is now prepared so that the focus can shift to the main objective: running and understanding chip-design examples.
+
+% ============================================================
+\section{Run the AES Example Design}
+
+In this section, the OpenROAD flow is tested using a ready-to-use example design provided by OpenROAD. This helps verify that the environment is functioning correctly before moving to custom designs.
+The AES example is used here. The goal is not to modify the design, but to understand how the automated flow operates from RTL input to final layout generation.
+The RTL source files for the example are located inside the \textbf{designs/src} directory. The platform-specific configuration files for AES are stored under the corresponding GF180 design directory.
+First, move to the designs directory and enter the source folder:
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts/flow/designs
+cd src
+ls
+\end{lstlisting}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1.00\textwidth]{10.png}
+    \caption{Listing available example designs in OpenROAD-flow-scripts, including the AES design example.}
+    \label{fig:aes-directory-files}
+\end{figure}
+
+In this directory, the available example designs can be seen. One of them is \textbf{aes}.
+Next, move to the AES platform directory and list its files:
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts/flow/designs/gf180/aes
+ls
+\end{lstlisting}
+
+The main configuration files for the AES example can now be seen, including:
+
+\begin{itemize}
+    \item \texttt{config.mk}
+    \item \texttt{constraint.sdc}
+\end{itemize}
+
+The \textbf{config.mk} file defines the primary design setup, while the \textbf{constraint.sdc} file contains the timing constraints used by the flow.
+Before running the AES example, it is useful to briefly inspect the \textbf{config.mk} file.
+This file contains the main configuration for the design, including the design name, target platform, Verilog source files, and timing constraints used during the flow.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.75\textwidth]{11.png}
+    \caption{Example contents of the AES \texttt{config.mk} file used to define the design, platform, RTL sources, and implementation settings.}
+    \label{fig:aes-config-file}
+\end{figure}
+
+After that, move to the flow directory and run the AES example:
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts/flow
+\end{lstlisting}
+
+\begin{lstlisting}
+make DESIGN_CONFIG=./designs/gf180/aes/config.mk
+\end{lstlisting}
+
+As soon as this command is executed, the automated OpenROAD design flow begins.
+The first major stage is \textbf{synthesis}, where the RTL description is converted into a gate-level netlist. This step is performed by \textbf{Yosys}.
+After synthesis, the flow automatically continues through the remaining physical-design stages, including:
+
+\begin{itemize}
+    \item Floorplanning
+    \item Placement
+    \item Clock Tree Synthesis (CTS)
+    \item Routing
+\end{itemize}
+
+These stages are executed sequentially without requiring manual intervention.
+Depending on the complexity of the design and the available system resources, the complete flow may take several minutes to finish.
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{12.png}
+    \caption{Successful completion of the automated OpenROAD AES implementation flow, including synthesis, placement, CTS, routing, and final GDS generation.}
+    \label{fig:aes-flow-complete}
+\end{figure}
+
+In Jupyter mode, the graphical interface may not appear because Jupyter provides a terminal-oriented environment rather than a full desktop interface.
+To view the final layout graphically, either use the VNC mode or open the generated GDS file locally using KLayout.
+A simple way to access the final layout is to download the generated GDS file directly from the JupyterLab file browser.
+The generated GDS file is typically located at:
+
+\begin{lstlisting}
+/foss/designs/OpenROAD-flow-scripts/flow/results/gf180/aes/base/6_1_merged.gds
+\end{lstlisting}
+
+After downloading the file to the local computer, open it using \textbf{KLayout}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.60\textwidth]{13.png}
+    \caption{Downloading the generated merged GDS file from JupyterLab and opening it locally with KLayout.}
+    \label{fig:download-gds-klayout}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.60\textwidth]{15.png}
+    \caption{Viewing the final AES GDS layout in KLayout after completing the automated OpenROAD flow.}
+    \label{fig:aes-final-layout}
+\end{figure}
+
+% ============================================================
+\section{Worked Example: AES Design with the GF180MCU OSU Library}
+
+This section presents a worked example based on an AES design integrated with the GF180MCU OSU standard-cell library. The objective of this example is to demonstrate how a realistic RTL design can be prepared and executed using the automated OpenROAD implementation flow.
+Compared with a very small test example, the AES design provides a more meaningful demonstration because it produces realistic synthesis logs, intermediate outputs, and physical-design results that can be analyzed throughout the flow.
+
+\subsection{Design Objective and Source Setup}
+
+The main objective of this example was to synthesize and implement an AES design using the GF180MCU OSU standard-cell library together with the automated OpenROAD flow.
+This example was selected because it provides a more realistic workflow than a minimal test design and makes it possible to observe real outputs, logs, and stage-by-stage behavior throughout the implementation process.
+The first practical step was identifying the correct location for the AES RTL source files inside the OpenROAD-flow-scripts directory structure.
+After reviewing the organization of the source tree, a dedicated source directory for the AES design was created under the design hierarchy. The AES RTL files were then placed inside that directory so they could be referenced directly by the design configuration files.
+This step was important because the OpenROAD flow depends on a consistent directory structure in order to recognize and process the design correctly.
+
+\subsection{Design Configuration}
+
+After placing the AES source files, the next step was creating the design-specific configuration file for the AES project.
+The configuration file was created at:
+
+\begin{lstlisting}
+~/OpenROAD-flow-scripts/flow/designs/gf180/aes/config.mk
+\end{lstlisting}
+
+The purpose of this file was to define the AES design within the automated flow and connect it to the appropriate source files, target platform, and implementation settings.
+This configuration step was necessary because the AES project needed to be treated as a custom design rather than one of the default examples already included in the repository.
+In practice, this file served as the primary entry point for launching the automated flow on the AES design.
+
+
+
+
+
+% ============================================================
+
+\end{document}
