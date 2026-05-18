@@ -52,6 +52,27 @@
 }
 \lstset{style=shell}
 
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+
+\newtcbox{\inlinecode}{on line,
+  colback=gray!12,
+  colframe=gray!12,
+  boxrule=0pt,
+  arc=2pt,
+  left=2pt,
+  right=2pt,
+  top=1pt,
+  bottom=1pt,
+  boxsep=1pt
+}
+\usepackage{caption}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage[hypcap=false]{caption}
+\usepackage{float}
+
 % ---------- Section formatting ----------
 \titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
@@ -105,7 +126,7 @@ In this tutorial, the documented setup was performed on Windows. Therefore, the 
 \begin{enumerate}
     \item Download Docker Desktop from the official Docker website for the appropriate operating system.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.80\textwidth]{1.png}
     \caption{Docker Desktop download page for selecting the appropriate installer.}
@@ -143,6 +164,11 @@ git checkout ieee_chipathon
 
 This switches the repository to the branch used for the Chipathon setup.
 
+\textbf{Note:} \inlinecode{DESIGNS=\$HOME/eda/designs}
+(\inlinecode{DESIGNS=\%USERPROFILE\%\textbackslash eda\textbackslash designs} for \inlinecode{.bat})
+sets the directory that holds your design files.
+This directory is mounted into the container on \inlinecode{/foss/designs}.
+
 \item Next, set the Docker image tag and start Jupyter:
 
 \begin{lstlisting}
@@ -160,9 +186,9 @@ SET DOCKER_TAG=chipathon26
 start_jupyter.bat
 \end{lstlisting}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{7.png}
+    \includegraphics[width=0.55\textwidth]{7.png}
     \caption{Successful startup of the Chipathon 26 Jupyter container in Command Prompt.}
     \label{fig:jupyter-container-start}
 \end{figure}
@@ -172,9 +198,9 @@ start_jupyter.bat
 Once the container is running, go to the \textbf{Ports} column and click \texttt{8888:8888} to open the Jupyter environment in a web browser.
 \end{enumerate}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.90\textwidth]{2.png}
+    \includegraphics[width=0.55\textwidth]{2.png}
     \caption{Docker Desktop showing the running Jupyter container and the available port link.}
     \label{fig:docker-jupyter-port}
   \vspace{0.2cm}
@@ -326,7 +352,7 @@ cd src
 ls
 \end{lstlisting}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=1.00\textwidth]{10.png}
     \caption{Listing available example designs in OpenROAD-flow-scripts, including the AES design example.}
@@ -352,7 +378,7 @@ The \textbf{config.mk} file defines the primary design setup, while the \textbf{
 Before running the AES example, it is useful to briefly inspect the \textbf{config.mk} file.
 This file contains the main configuration for the design, including the design name, target platform, Verilog source files, and timing constraints used during the flow.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\textwidth]{11.png}
     \caption{Example contents of the AES \texttt{config.mk} file used to define the design, platform, RTL sources, and implementation settings.}
@@ -384,7 +410,7 @@ These stages are executed sequentially without requiring manual intervention.
 Depending on the complexity of the design and the available system resources, the complete flow may take several minutes to finish.
 
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{12.png}
     \caption{Successful completion of the automated OpenROAD AES implementation flow, including synthesis, placement, CTS, routing, and final GDS generation.}
@@ -402,48 +428,299 @@ The generated GDS file is typically located at:
 
 After downloading the file to the local computer, open it using \textbf{KLayout}.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.60\textwidth]{13.png}
     \caption{Downloading the generated merged GDS file from JupyterLab and opening it locally with KLayout.}
     \label{fig:download-gds-klayout}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.60\textwidth]{15.png}
     \caption{Viewing the final AES GDS layout in KLayout after completing the automated OpenROAD flow.}
     \label{fig:aes-final-layout}
 \end{figure}
-
 % ============================================================
-\section{Worked Example: AES Design with the GF180MCU OSU Library}
+% ============================================================
+\clearpage
+\section{Worked Example: AES Implementation with the GF180MCU OSU Standard-Cell Library}
 
-This section presents a worked example based on an AES design integrated with the GF180MCU OSU standard-cell library. The objective of this example is to demonstrate how a realistic RTL design can be prepared and executed using the automated OpenROAD implementation flow.
-Compared with a very small test example, the AES design provides a more meaningful demonstration because it produces realistic synthesis logs, intermediate outputs, and physical-design results that can be analyzed throughout the flow.
+In the previous section, the built-in AES example provided by OpenROAD-flow-scripts was used to demonstrate the default automated implementation flow inside the container environment. That example served as a baseline for understanding how the flow operates using the standard design setup already available in OpenROAD.
 
-\subsection{Design Objective and Source Setup}
+In this section, the same AES design is reused, but the library environment is modified so that the design is implemented with the GF180MCU OSU standard-cell library instead of the default library configuration. The purpose of this worked example is to show how an existing OpenROAD example can be adapted to a different standard-cell library and then evaluated within the same containerized flow.
 
-The main objective of this example was to synthesize and implement an AES design using the GF180MCU OSU standard-cell library together with the automated OpenROAD flow.
-This example was selected because it provides a more realistic workflow than a minimal test design and makes it possible to observe real outputs, logs, and stage-by-stage behavior throughout the implementation process.
-The first practical step was identifying the correct location for the AES RTL source files inside the OpenROAD-flow-scripts directory structure.
-After reviewing the organization of the source tree, a dedicated source directory for the AES design was created under the design hierarchy. The AES RTL files were then placed inside that directory so they could be referenced directly by the design configuration files.
-This step was important because the OpenROAD flow depends on a consistent directory structure in order to recognize and process the design correctly.
+This approach is useful because it allows the effect of library substitution to be studied on a realistic design rather than on a minimal test case. Since AES is already available in the OpenROAD example set, it provides a convenient and meaningful benchmark for documenting the required configuration changes, the integration procedure, and the practical issues that arise during implementation.
 
-\subsection{Design Configuration}
+The standard cells used in this work are taken from the GF180MCU OSU standard-cell library developed at Oklahoma State University. This library was designed by James E. Stine, Jr. and the VLSI Computer Architecture Research Group.
 
-After placing the AES source files, the next step was creating the design-specific configuration file for the AES project.
-The configuration file was created at:
+\subsection{Matching the OpenROAD Configuration to the OSU Library}
+
+The AES RTL files and the related configuration files have to  organize so that they can be referenced consistently by the modified design setup. This step is important because the OpenROAD flow depends on a fixed directory structure and correctly referenced input files in order to recognize and process the design properly.
+
+To use the GF180MCU OSU standard-cell library instead of the default library, the relevant OpenROAD configuration files must be updated in the proper locations. In this setup, the design-specific configuration is modified in the AES design directory, while the platform-level settings are adjusted in the GF180 platform directory.
+
+The main design-level changes are made in the following file:
+\begin{itemize}
+    \item \texttt{/foss/designs/OpenROAD-flow-scripts/flow/designs/gf180/aes/config.mk}
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth, trim=0 120 0 0, clip]{config-aes.png}
+    \caption{Modified AES \texttt{config.mk} file located under \texttt{flow/designs/gf180/aes}.}
+    \label{fig:aes_osu_config}
+\end{figure}
+
+This file is updated so that the AES design points to the modified synthesized netlist, the OSU GDS file, the OSU standard-cell LEF, the OSU site LEF, and the technology LEF used for this library setup. In this way, the design is evaluated using the intended OSU library views rather than the default GF180 library configuration.
+
+The platform-level changes are applied in:
+\begin{itemize}
+    \item \texttt{/foss/designs/OpenROAD-flow-scripts/flow/platforms/gf180/config.mk}
+\end{itemize}
+
+\begin{center}
+    \includegraphics[width=0.60\textwidth]{osu3-1.png}
+
+    \vspace{0.15cm}
+
+    \includegraphics[width=0.60\textwidth]{osu3-2.png}
+
+    \vspace{0.15cm}
+
+    \includegraphics[width=0.70\textwidth]{osu3-3.png}
+
+    \captionof{figure}{GF180 platform \texttt{config.mk} sections used for the GF180MCU OSU library integration.}
+    \label{fig:gf180_platform_config}
+\end{center}
+
+This file defines the platform defaults used by the OpenROAD flow, including library-dependent settings such as filler cells, tie cells, and technology-level references. These settings must be checked carefully to ensure that they remain consistent with the selected OSU library.
+
+In addition to the configuration files, the technology-mapping files must also be matched to the target library. In this example, the files
+\texttt{cells\_adders.v} and \texttt{cells\_latch.v}, located under
+\texttt{/foss/designs/OpenROAD-flow-scripts/flow/platforms/gf180/},
+are reviewed and aligned with the GF180MCU OSU library.
+
+This means that the mapped cells, instance names, and pin connections used in these files must correspond exactly to the cell names and pin names provided by the OSU library.
+
+\begin{figure}[H]
+    \centering
+
+    \begin{subfigure}{0.55\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{adder.png}
+        \caption{\texttt{cells\_adders.v}}
+        \label{fig:osu_adders}
+    \end{subfigure}
+
+    \vspace{0.3cm}
+
+    \begin{subfigure}{0.53\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{osu2.png}
+        \caption{\texttt{cells\_latch.v}}
+        \label{fig:osu_latch}
+    \end{subfigure}
+
+    \caption{Technology-mapping files aligned with the GF180MCU OSU standard-cell library.}
+    \label{fig:osu_techmap_files}
+\end{figure}
+
+Therefore, integrating the AES example with the GF180MCU OSU standard-cell library requires both configuration-level changes and cell-mapping consistency checks. The design files, platform files, and mapping files must all refer to the same library views in order for the OpenROAD flow to process the design correctly.
+
+After the configuration is completed, go to the flow directory and run:
 
 \begin{lstlisting}
-~/OpenROAD-flow-scripts/flow/designs/gf180/aes/config.mk
+cd /foss/designs/OpenROAD-flow-scripts/flow
+make DESIGN_CONFIG=./designs/gf180/aes/config.mk
 \end{lstlisting}
 
-The purpose of this file was to define the AES design within the automated flow and connect it to the appropriate source files, target platform, and implementation settings.
-This configuration step was necessary because the AES project needed to be treated as a custom design rather than one of the default examples already included in the repository.
-In practice, this file served as the primary entry point for launching the automated flow on the AES design.
+If an error occurs during the flow, first fix the problem. Then remove the generated intermediate files and run the flow again from the same directory.
+
+\begin{lstlisting}
+cd /foss/designs/OpenROAD-flow-scripts/flow
+make clean_all DESIGN_CONFIG=./designs/gf180/aes/config.mk
+make DESIGN_CONFIG=./designs/gf180/aes/config.mk
+\end{lstlisting}
+
+If the flow completes successfully, the final result files should be visible in the AES output directory. In particular, files such as \texttt{6\_final.gds}, \texttt{6\_final.def}, \texttt{6\_final.v}, and \texttt{6\_final.sdc} should appear. This confirms that the main OpenROAD implementation stages have completed correctly with the GF180MCU OSU standard-cell library.
+An example of the expected final output is shown in Figure~\ref{fig:osu_aes_final_results}.
+If the flow completes successfully, the final result files should be visible in the AES output directory. In particular, files such as \texttt{6\_final.gds}, \texttt{6\_final.def}, \texttt{6\_final.v}, and \texttt{6\_final.sdc} should appear. This confirms that the main OpenROAD implementation stages have completed correctly with the GF180MCU OSU standard-cell library.
+
+An example of the expected final output is shown in Figure~\ref{fig:osu_aes_final_results}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{result.png}
+    \caption{Example of a successful AES run using the GF180MCU OSU standard-cell library, showing the generated final output files in the OpenROAD results directory.}
+    \label{fig:osu_aes_final_results}
+\end{figure}
+
+In Jupyter mode, interactive layout inspection is less convenient because Jupyter primarily provides a terminal-based environment rather than a full graphical desktop interface. For this reason, if the goal is to inspect layout layers visually, there are two practical options. The first option is to download the generated GDS file from Jupyter and open it locally in KLayout. The second option is to use the VNC interface and view the layout directly inside the container.
+
+If the VNC method is preferred, open a Windows Command Prompt and run:
+
+\begin{lstlisting}
+cd %USERPROFILE%\eda\designs\iic-osic-tools
+SET DOCKER_TAG=chipathon26
+start_vnc.bat
+\end{lstlisting}
+
+After the VNC container starts, open Docker Desktop and select the corresponding VNC port, as shown in Figure~\ref{fig:vnc_docker_port}. Then open the VNC session in a web browser. When the login prompt appears, enter the default password:
+
+\begin{lstlisting}
+abc123
+\end{lstlisting}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{vnc.png}
+    \caption{Docker Desktop showing the running VNC container and the port used to open the graphical desktop session.}
+    \label{fig:vnc_docker_port}
+\end{figure}
+
+Once the graphical desktop opens, right-click on the desktop background and open a terminal window inside the VNC session.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{open_terminal.png}
+    \caption{Opening a terminal in the VNC session.}
+    \label{fig:vnc_open_terminal}
+\end{figure}
+
+Then launch KLayout with:
+
+\begin{lstlisting}
+klayout /foss/designs/OpenROAD-flow-scripts/flow/results/gf180/aes/base/6_1_merged.gds
+\end{lstlisting}
+
+A full-chip view of the complete final GDS layout is shown in Figure~\ref{fig:osu_aes_complete_gds}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{complete_gds.png}
+    \caption{Top-level view of the complete final AES GDS layout generated with the GF180MCU OSU standard-cell library, shown in KLayout.}
+    \label{fig:osu_aes_complete_gds}
+\end{figure}
+
+The zoomed-in view in Figure~\ref{fig:klayout_osu_layout} shows the layout in greater detail and makes the OSU standard cells visible inside the final design.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{klayout-osu.png}
+    \caption{Zoomed-in view of the generated GDS layout in KLayout, showing the routing layers and visible OSU standard cells inside the final design.}
+    \label{fig:klayout_osu_layout}
+\end{figure}
 
 
+% ============================================================
+\section{Debugging and Problem Resolution}
+
+This section documents several practical issues encountered during the setup and execution of the OpenROAD workflow, together with the corresponding debugging steps and solutions.
+Because this workflow integrates multiple tools, scripts, libraries, and container configurations, various compatibility and runtime problems may appear during execution. Recording these issues and their corresponding solutions is important because it helps future users reproduce the workflow more reliably and understand the reasoning behind each modification.
+
+
+\subsection{Incorrect \texttt{ABC\_DRIVER\_CELL} and \texttt{MIN\_BUF\_CELL} Names}
+
+\textbf{Problem:}  
+The original platform configuration used incorrect cell-name expressions for the buffer cells:
+
+\begin{lstlisting}
+export ABC_DRIVER_CELL = gf180mcu_osu_sc_gp9t3v3$(TRACK_OPTION)$(POWER_OPTION)__buf_4
+export MIN_BUF_CELL_AND_PORTS = gf180mcu_osu_sc_gp9t3v3$(TRACK_OPTION)$(POWER_OPTION)__buf_1 A Y
+\end{lstlisting}
+
+\textbf{Debugging:}  
+The correct buffer-cell names were checked from the Liberty files using:
+
+\begin{lstlisting}
+grep -i "cell.*buf_4" .../lib/*.lib | head -5
+\end{lstlisting}
+
+\textbf{Solution:}  
+The cell names were corrected as follows:
+
+\begin{lstlisting}
+export ABC_DRIVER_CELL = gf180mcu_osu_sc_gp9t3v3__buf_4
+export MIN_BUF_CELL_AND_PORTS = gf180mcu_osu_sc_gp9t3v3__buf_1 A Y
+\end{lstlisting}
+
+\subsection{Broken Final Line in the Platform \texttt{config.mk}}
+
+\textbf{Problem:}  
+The last line of the platform configuration file was corrupted:
+
+\begin{lstlisting}
+-include $(GF180_PRIVATE_DIR)/private.mk80_PRIVATE_DIR)/private.mk
+\end{lstlisting}
+
+\textbf{Solution:}  
+The line was corrected to:
+
+\begin{lstlisting}
+-include $(GF180_PRIVATE_DIR)/private.mk
+\end{lstlisting}
+
+
+
+\subsection{Resolving the SITE Definition Mismatch for OSU Library Integration}
+
+\textbf{Problem:}  
+During detailed placement, the flow failed because the site definition used by the OSU standard-cell library was not consistent with the default GF180 technology LEF used in the platform setup. As a result, the placement rows generated from the platform technology definition did not match the physical site requirements of the OSU cells, which led to complete detailed-placement failure:
+
+\begin{lstlisting}
+Diamond Move Success: 0 (0.00%)
+Total Placement Failures: 11004
+[ERROR DPL-0036] Detailed placement failed
+\end{lstlisting}
+
+\textbf{Debugging:}  
+To identify the cause of the failure, the site definitions in the OSU library LEF and the default GF180 technology LEF were compared:
+
+\begin{lstlisting}
+grep -A5 "^SITE" .../lef/gf180mcu_osu_sc_gp9t3v3_site.lef
+grep -A5 "^SITE" .../lef/gf180mcu_5LM_1TM_9K_9t_tech.lef
+\end{lstlisting}
+
+The OSU library used the following site size:
+
+\begin{lstlisting}
+SIZE 0.56 BY 6.35
+\end{lstlisting}
+
+whereas the default GF180 platform technology LEF used:
+
+\begin{lstlisting}
+SIZE 0.56 BY 5.04
+\end{lstlisting}
+
+This mismatch indicated that the placement site used by the platform was incompatible with the OSU cell library in this integration setup.
+
+\textbf{Solution:}  
+Instead of modifying the original technology LEF directly, a separate adapted technology LEF file was created for the OSU-based flow. In this file, the site name and site size were updated so that the platform row definition matched the OSU library site definition:
+
+\begin{lstlisting}
+cp .../gf180mcu_5LM_1TM_9K_9t_tech.lef \
+   .../gf180mcu_5LM_1TM_9K_9t_tech_osu.lef
+
+sed -i 's/SITE GF018hv5v_green_sc9/SITE gf180mcu_osu_sc_gp9t3v3/g' \
+    .../gf180mcu_5LM_1TM_9K_9t_tech_osu.lef
+
+sed -i 's/SIZE 0.56 BY 5.04/SIZE 0.56 BY 6.35/g' \
+    .../gf180mcu_5LM_1TM_9K_9t_tech_osu.lef
+
+sed -i 's/END GF018hv5v_green_sc9/END gf180mcu_osu_sc_gp9t3v3/g' \
+    .../gf180mcu_5LM_1TM_9K_9t_tech_osu.lef
+\end{lstlisting}
+
+The design configuration was then updated to use the adapted technology LEF:
+
+\begin{lstlisting}
+export TECH_LEF = .../gf180mcu_5LM_1TM_9K_9t_tech_osu.lef
+\end{lstlisting}
+
+\textbf{Remarks:}  
+This modification is used here as an integration step to make the OpenROAD platform technology definition consistent with the OSU library site definition. It is not presented as a universal modification to the GF180 platform, but as a library-specific compatibility adjustment for this worked example.
 
 
 
